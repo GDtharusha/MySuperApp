@@ -1,73 +1,105 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>My First Capacitor App</title>
+    <title>Jarvis Spy Tool</title>
     <style>
-        /* මුළු ඇප් එකම Dark Mode */
-        
-        body {
-            background-color: #121212;
-            color: #ffffff;
-            font-family: 'Segoe UI', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            user-select: none;
-            /* Text select කරන්න බෑ ඇප් එකක් වගේ */
-        }
-        
-        h1 {
-            color: #00d4ff;
-            font-size: 2rem;
-            margin-bottom: 10px;
-        }
-        
-        p {
-            color: #aaaaaa;
-        }
-        /* ලස්සන බටන් එකක් */
-        
-        .magic-btn {
-            background: linear-gradient(45deg, #ff00cc, #3333ff);
-            border: none;
-            padding: 15px 40px;
-            color: white;
-            font-size: 18px;
-            font-weight: bold;
-            border-radius: 50px;
-            box-shadow: 0 4px 15px rgba(255, 0, 204, 0.4);
-            cursor: pointer;
-            transition: transform 0.2s;
-            margin-top: 30px;
-        }
-        
-        .magic-btn:active {
-            transform: scale(0.95);
-            /* ඔබනකොට පොඩි වෙන්න */
-        }
+        /* පරණ CSS ටිකමයි */
+        body { background-color: #0d1117; color: #c9d1d9; font-family: 'Courier New', Courier, monospace; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        h1 { color: #58a6ff; border-bottom: 2px solid #58a6ff; padding-bottom: 10px; }
+        .card { background: #161b22; width: 100%; max-width: 400px; padding: 20px; margin: 10px 0; border-radius: 10px; border: 1px solid #30363d; text-align: center; }
+        .status-text { font-size: 1.2rem; font-weight: bold; margin: 10px 0; }
+        .online { color: #2ea043; }
+        .offline { color: #da3633; }
+        button { width: 100%; padding: 15px; margin-top: 10px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .btn-cam { background-color: #238636; color: white; }
+        .btn-info { background-color: #1f6feb; color: white; }
+        .btn-cam:active, .btn-info:active { transform: scale(0.98); opacity: 0.8; }
+        #photo-preview { width: 100%; margin-top: 15px; border-radius: 8px; display: none; border: 2px solid #58a6ff; }
     </style>
-</head>
 
+    <script type="module" src="https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.esm.js"></script>
+    <script nomodule src="https://unpkg.com/@ionic/pwa-elements@latest/dist/ionicpwaelements/ionicpwaelements.js"></script>
+</head>
 <body>
 
-    <h1>🚀 Welcome Sir!</h1>
-    <p>This is your first Super App.</p>
+    <h1>🕵️‍♂️ JARVIS SPY DASHBOARD</h1>
 
-    <button class="magic-btn" onclick="sayHello()">Click Me</button>
+    <div class="card">
+        <h3>📡 Network Status</h3>
+        <div id="net-status" class="status-text online">Checking...</div>
+    </div>
 
-    <script>
-        function sayHello() {
-            // මේක නිකන්ම Alert එකක්. පස්සේ අපි මෙතනට Native ඒවා දාමු.
-            alert("Jarvis System Connected Successfully! ✅");
+    <div class="card">
+        <h3>📱 Device Info</h3>
+        <p id="device-info">Waiting for data...</p>
+        <button class="btn-info" onclick="getDeviceInfo()">Get Battery & Model</button>
+    </div>
+
+    <div class="card">
+        <h3>📸 Secret Camera</h3>
+        <button class="btn-cam" onclick="takePicture()">Take Photo & Save</button>
+        <img id="photo-preview" alt="Captured Photo">
+    </div>
+
+    <script type="module">
+        import { Camera, CameraResultType, CameraSource } from 'https://esm.sh/@capacitor/camera';
+        import { Device } from 'https://esm.sh/@capacitor/device';
+        import { Network } from 'https://esm.sh/@capacitor/network';
+        import { Toast } from 'https://esm.sh/@capacitor/toast';
+
+        // 1. Network
+        async function checkNetwork() {
+            try {
+                const status = await Network.getStatus();
+                const el = document.getElementById('net-status');
+                if(status.connected) {
+                    el.innerText = "ONLINE 🟢";
+                    el.className = "status-text online";
+                } else {
+                    el.innerText = "OFFLINE 🔴";
+                    el.className = "status-text offline";
+                }
+            } catch (e) { console.log("Network check failed in browser"); }
+        }
+        setInterval(checkNetwork, 3000);
+        checkNetwork();
+
+        // 2. Device Info
+        window.getDeviceInfo = async function() {
+            try {
+                const info = await Device.getInfo();
+                const battery = await Device.getBatteryInfo();
+                document.getElementById('device-info').innerHTML = 
+                    `Model: ${info.model || 'PC'} <br> Platform: ${info.platform} <br> Battery: ${(battery.batteryLevel * 100).toFixed(0)}% 🔋`;
+            } catch (e) {
+                document.getElementById('device-info').innerHTML = "PC Mode (Battery info hidden)";
+            }
+        }
+
+        // 3. Camera (Fixed)
+        window.takePicture = async function() {
+            try {
+                const image = await Camera.getPhoto({
+                    quality: 90,
+                    allowEditing: false,
+                    resultType: CameraResultType.Uri,
+                    source: CameraSource.Camera,
+                    saveToGallery: true // ෆෝන් එකේ නම් ගැලරි එකට සේව් වෙන්න දානවා
+                });
+
+                const imgEl = document.getElementById('photo-preview');
+                imgEl.src = image.webPath;
+                imgEl.style.display = 'block';
+
+                await Toast.show({ text: 'Photo Captured!', duration: 'short' });
+
+            } catch (error) {
+                console.log("Camera Error: " + error);
+                // User කැන්සල් කළොත් එරර් එකක් එන එක සාමාන්‍යයි
+            }
         }
     </script>
-
 </body>
-
 </html>
