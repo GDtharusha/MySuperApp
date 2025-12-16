@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web Assets
+        run: npm run build
+        # Note: ඔයාගේ package.json එකේ build command එකක් නැත්නම් මේ පේළිය වැඩ නොකරන්න පුළුවන්. 
+        # එහෙම වුනොත් මේ පේළිය මකලා දාන්න. අපි දැනට index.html කෙලින්ම www එකට දැම්මනේ.
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Build APK with Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: jarvis-app-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
