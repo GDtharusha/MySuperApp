@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>My First Capacitor App</title>
+    <style>
+        /* මුළු ඇප් එකම Dark Mode */
+        
+        body {
+            background-color: #121212;
+            color: #ffffff;
+            font-family: 'Segoe UI', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            user-select: none;
+            /* Text select කරන්න බෑ ඇප් එකක් වගේ */
+        }
+        
+        h1 {
+            color: #00d4ff;
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        
+        p {
+            color: #aaaaaa;
+        }
+        /* ලස්සන බටන් එකක් */
+        
+        .magic-btn {
+            background: linear-gradient(45deg, #ff00cc, #3333ff);
+            border: none;
+            padding: 15px 40px;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(255, 0, 204, 0.4);
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 30px;
+        }
+        
+        .magic-btn:active {
+            transform: scale(0.95);
+            /* ඔබනකොට පොඩි වෙන්න */
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>🚀 Welcome Sir!</h1>
+    <p>This is your first Super App.</p>
+
+    <button class="magic-btn" onclick="sayHello()">Click Me</button>
+
+    <script>
+        function sayHello() {
+            // මේක නිකන්ම Alert එකක්. පස්සේ අපි මෙතනට Native ඒවා දාමු.
+            alert("Jarvis System Connected Successfully! ✅");
+        }
+    </script>
+
+</body>
+
+</html>
