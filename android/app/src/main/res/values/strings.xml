@@ -4,4 +4,6 @@
     <string name="title_activity_main">mysuperapp</string>
     <string name="package_name">com.example.app</string>
     <string name="custom_url_scheme">com.example.app</string>
+    <string name="keyboard_name">Jarvis Keyboard</string>
+    <string name="subtype_en_US">English (US)</string>
 </resources>
