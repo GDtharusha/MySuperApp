@@ -1,676 +1,481 @@
 package com.example.app;
 
-import android.content.Context;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.inputmethodservice.InputMethodService;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Looper;
 import android.os.Vibrator;
-import android.os.VibratorManager;
 import android.os.VibrationEffect;
 import android.util.Log;
-import android.view.ContextThemeWrapper;
+import android.util.TypedValue;
 import android.view.Gravity;
-import android.view.KeyEvent;
 import android.view.View;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
-import android.webkit.ConsoleMessage;
-import android.webkit.JavascriptInterface;
-import android.webkit.WebChromeClient;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
- * FastKeyboardService - ස්ථාවර හයිබ්‍රිඩ් කීබෝඩ්
+ * FastKeyboardService - Pure Native Keyboard (No WebView)
  * 
- * මෙම implementation එක Android 10-15 සඳහා crash-proof ලෙස නිර්මාණය කර ඇත.
- * Capacitor projects සමඟ ගැටුම් නොවන ලෙස WebView isolated කර ඇත.
+ * මෙය 100% Native Java keyboard එකක්.
+ * WebView නැති නිසා crash වෙන්නේ නැහැ.
  * 
- * @version 3.0.0-stable
+ * Package: com.example.app
  */
-public class FastKeyboardService extends InputMethodService {
+public class FastKeyboardService extends InputMethodService implements View.OnClickListener, View.OnLongClickListener {
 
-    // ════════════════════════════════════════════════════════════════════
-    // නියතයන් (Constants)
-    // ════════════════════════════════════════════════════════════════════
-    
     private static final String TAG = "FastKeyboard";
-    private static final String BRIDGE_NAME = "AndroidBridge";
-    private static final String KEYBOARD_URL = "file:///android_asset/keyboard.html";
-    private static final int KEYBOARD_HEIGHT_DP = 260;
+    
+    // State
+    private boolean isShift = false;
+    private boolean isCaps = false;
+    private boolean isNumbers = false;
+    
+    // Views
+    private LinearLayout keyboardView;
+    private Vibrator vibrator;
+    
+    // Layouts
+    private static final String[][] LETTERS = {
+        {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
+        {"a", "s", "d", "f", "g", "h", "j", "k", "l"},
+        {"SHIFT", "z", "x", "c", "v", "b", "n", "m", "DEL"},
+        {"123", ",", "SPACE", ".", "ENTER"}
+    };
+    
+    private static final String[][] NUMBERS = {
+        {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
+        {"@", "#", "$", "%", "&", "-", "+", "(", ")"},
+        {"=", "*", "\"", "'", ":", ";", "!", "?", "DEL"},
+        {"ABC", ",", "SPACE", ".", "ENTER"}
+    };
 
     // ════════════════════════════════════════════════════════════════════
-    // Instance Variables
-    // ════════════════════════════════════════════════════════════════════
-    
-    private FrameLayout mRootContainer;
-    private WebView mWebView;
-    private TextView mFallbackView;
-    
-    private boolean mIsWebViewReady = false;
-    private boolean mWebViewFailed = false;
-    
-    private Handler mHandler;
-    private Vibrator mVibrator;
-
-    // ════════════════════════════════════════════════════════════════════
-    // LIFECYCLE: onCreate - Service එක ආරම්භ වන විට
+    // LIFECYCLE
     // ════════════════════════════════════════════════════════════════════
 
     @Override
     public void onCreate() {
         super.onCreate();
-        Log.d(TAG, "onCreate() - Service ආරම්භ විය");
+        Log.d(TAG, "✓ onCreate() - Service started");
         
-        // Main thread handler එක initialize කරනවා
-        mHandler = new Handler(Looper.getMainLooper());
-        
-        // Vibrator service එක ආරක්ෂිතව ලබාගන්නවා
-        initializeVibrator();
-    }
-    
-    /**
-     * Vibrator service එක ආරක්ෂිතව initialize කරනවා
-     * Android 12+ සඳහා VibratorManager භාවිතා කරනවා
-     */
-    private void initializeVibrator() {
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                VibratorManager vm = (VibratorManager) getSystemService(Context.VIBRATOR_MANAGER_SERVICE);
-                if (vm != null) {
-                    mVibrator = vm.getDefaultVibrator();
-                }
-            } else {
-                mVibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-            }
-            Log.d(TAG, "Vibrator initialized successfully");
+            vibrator = (Vibrator) getSystemService(VIBRATOR_SERVICE);
         } catch (Exception e) {
-            Log.w(TAG, "Vibrator service ලබාගැනීමට නොහැකි විය", e);
+            Log.e(TAG, "Vibrator init failed", e);
         }
     }
-
-    // ════════════════════════════════════════════════════════════════════
-    // LIFECYCLE: onCreateInputView - කීබෝඩ් UI සාදන ප්‍රධාන method එක
-    // ════════════════════════════════════════════════════════════════════
 
     @Override
     public View onCreateInputView() {
-        Log.d(TAG, "onCreateInputView() - කීබෝඩ් UI සාදමින්");
+        Log.d(TAG, "✓ onCreateInputView() - Creating keyboard UI");
         
         try {
-            // පියවර 1: Root container එක සාදනවා (ආරක්ෂිත context එකෙන්)
-            mRootContainer = createSafeContainer();
-            
-            // පියවර 2: WebView සෑදීමට උත්සාහ කරනවා
-            if (!mWebViewFailed) {
-                try {
-                    mWebView = createSafeWebView();
-                    
-                    if (mWebView != null) {
-                        // WebView එක container එකට add කරනවා
-                        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT,
-                            FrameLayout.LayoutParams.MATCH_PARENT
-                        );
-                        mRootContainer.addView(mWebView, params);
-                        
-                        // keyboard.html load කරනවා
-                        mWebView.loadUrl(KEYBOARD_URL);
-                        Log.d(TAG, "WebView සාදා HTML load කෙරිණි: " + KEYBOARD_URL);
-                    } else {
-                        throw new RuntimeException("WebView creation null ලැබුණි");
-                    }
-                    
-                } catch (Exception e) {
-                    Log.e(TAG, "WebView සෑදීම අසාර්ථක විය, fallback භාවිතා කරනවා", e);
-                    mWebViewFailed = true;
-                    addFallbackView();
+            keyboardView = createKeyboard();
+            Log.d(TAG, "✓ Keyboard created successfully!");
+            return keyboardView;
+        } catch (Exception e) {
+            Log.e(TAG, "✗ Keyboard creation failed!", e);
+            return createErrorView(e.getMessage());
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // KEYBOARD CREATION
+    // ════════════════════════════════════════════════════════════════════
+
+    private LinearLayout createKeyboard() {
+        LinearLayout keyboard = new LinearLayout(this);
+        keyboard.setOrientation(LinearLayout.VERTICAL);
+        keyboard.setBackgroundColor(Color.parseColor("#1a1a2e"));
+        keyboard.setPadding(dp(4), dp(8), dp(4), dp(12));
+        
+        // Layout params for keyboard
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            dp(260)
+        );
+        keyboard.setLayoutParams(params);
+        
+        // Get current layout
+        String[][] layout = isNumbers ? NUMBERS : LETTERS;
+        
+        // Create rows
+        for (int i = 0; i < layout.length; i++) {
+            keyboard.addView(createRow(layout[i], i));
+        }
+        
+        return keyboard;
+    }
+    
+    private LinearLayout createRow(String[] keys, int rowIndex) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER);
+        
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            0, 1f
+        );
+        rowParams.setMargins(0, dp(3), 0, dp(3));
+        row.setLayoutParams(rowParams);
+        
+        // Add padding to row 2 (A-L row)
+        if (rowIndex == 1) {
+            row.setPadding(dp(16), 0, dp(16), 0);
+        }
+        
+        for (String key : keys) {
+            row.addView(createKey(key));
+        }
+        
+        return row;
+    }
+    
+    private TextView createKey(String key) {
+        TextView keyView = new TextView(this);
+        
+        // Set text
+        String displayText = getDisplayText(key);
+        keyView.setText(displayText);
+        keyView.setGravity(Gravity.CENTER);
+        keyView.setTextColor(Color.WHITE);
+        keyView.setTypeface(Typeface.DEFAULT_BOLD);
+        
+        // Text size based on key type
+        if (key.length() == 1) {
+            keyView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 22);
+        } else {
+            keyView.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
+        }
+        
+        // Layout params
+        float weight = getKeyWeight(key);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            0, LinearLayout.LayoutParams.MATCH_PARENT, weight
+        );
+        params.setMargins(dp(2), 0, dp(2), 0);
+        keyView.setLayoutParams(params);
+        
+        // Background
+        keyView.setBackground(createKeyBackground(key));
+        
+        // Tag for identification
+        keyView.setTag(key);
+        
+        // Click listeners
+        keyView.setOnClickListener(this);
+        keyView.setOnLongClickListener(this);
+        
+        // Make clickable
+        keyView.setClickable(true);
+        keyView.setFocusable(true);
+        
+        return keyView;
+    }
+    
+    private String getDisplayText(String key) {
+        switch (key) {
+            case "SHIFT":
+                return (isShift || isCaps) ? "⬆" : "⇧";
+            case "DEL":
+                return "⌫";
+            case "ENTER":
+                return "↵";
+            case "SPACE":
+                return "space";
+            case "123":
+                return "123";
+            case "ABC":
+                return "ABC";
+            default:
+                if (key.length() == 1 && Character.isLetter(key.charAt(0))) {
+                    return (isShift || isCaps) ? key.toUpperCase() : key.toLowerCase();
                 }
+                return key;
+        }
+    }
+    
+    private float getKeyWeight(String key) {
+        switch (key) {
+            case "SPACE":
+                return 4f;
+            case "SHIFT":
+            case "DEL":
+            case "123":
+            case "ABC":
+            case "ENTER":
+                return 1.4f;
+            default:
+                return 1f;
+        }
+    }
+    
+    private StateListDrawable createKeyBackground(String key) {
+        StateListDrawable states = new StateListDrawable();
+        
+        // Colors based on key type
+        int normalColor, pressedColor;
+        
+        switch (key) {
+            case "ENTER":
+                normalColor = Color.parseColor("#2060a0");
+                pressedColor = Color.parseColor("#3080c0");
+                break;
+            case "SHIFT":
+                if (isShift || isCaps) {
+                    normalColor = Color.parseColor("#4080a0");
+                    pressedColor = Color.parseColor("#50a0c0");
+                } else {
+                    normalColor = Color.parseColor("#28284a");
+                    pressedColor = Color.parseColor("#404068");
+                }
+                break;
+            case "DEL":
+            case "123":
+            case "ABC":
+                normalColor = Color.parseColor("#28284a");
+                pressedColor = Color.parseColor("#404068");
+                break;
+            case "SPACE":
+                normalColor = Color.parseColor("#404065");
+                pressedColor = Color.parseColor("#505080");
+                break;
+            default:
+                normalColor = Color.parseColor("#3d3d5c");
+                pressedColor = Color.parseColor("#5a5a8c");
+        }
+        
+        // Pressed state
+        GradientDrawable pressed = new GradientDrawable();
+        pressed.setColor(pressedColor);
+        pressed.setCornerRadius(dp(6));
+        states.addState(new int[]{android.R.attr.state_pressed}, pressed);
+        
+        // Normal state
+        GradientDrawable normal = new GradientDrawable();
+        normal.setColor(normalColor);
+        normal.setCornerRadius(dp(6));
+        states.addState(new int[]{}, normal);
+        
+        return states;
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    // CLICK HANDLING
+    // ════════════════════════════════════════════════════════════════════
+
+    @Override
+    public void onClick(View v) {
+        String key = (String) v.getTag();
+        if (key == null) return;
+        
+        vibrate();
+        handleKey(key);
+    }
+    
+    @Override
+    public boolean onLongClick(View v) {
+        String key = (String) v.getTag();
+        if (key == null) return false;
+        
+        // Long press on DEL = delete word
+        if (key.equals("DEL")) {
+            vibrate();
+            deleteWord();
+            return true;
+        }
+        
+        return false;
+    }
+    
+    private void handleKey(String key) {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) {
+            Log.w(TAG, "InputConnection is null!");
+            return;
+        }
+        
+        switch (key) {
+            case "SHIFT":
+                handleShift();
+                break;
+                
+            case "DEL":
+                ic.deleteSurroundingText(1, 0);
+                break;
+                
+            case "ENTER":
+                handleEnter(ic);
+                break;
+                
+            case "SPACE":
+                ic.commitText(" ", 1);
+                autoUnshift();
+                break;
+                
+            case "123":
+                isNumbers = true;
+                refreshKeyboard();
+                break;
+                
+            case "ABC":
+                isNumbers = false;
+                refreshKeyboard();
+                break;
+                
+            default:
+                // Regular character
+                String text = key;
+                if ((isShift || isCaps) && key.length() == 1 && Character.isLetter(key.charAt(0))) {
+                    text = key.toUpperCase();
+                }
+                ic.commitText(text, 1);
+                autoUnshift();
+        }
+    }
+    
+    private void handleShift() {
+        if (isCaps) {
+            // Turn off caps lock
+            isCaps = false;
+            isShift = false;
+        } else if (isShift) {
+            // Double tap = caps lock
+            isCaps = true;
+        } else {
+            // Single tap = shift
+            isShift = true;
+        }
+        refreshKeyboard();
+    }
+    
+    private void autoUnshift() {
+        if (isShift && !isCaps) {
+            isShift = false;
+            refreshKeyboard();
+        }
+    }
+    
+    private void handleEnter(InputConnection ic) {
+        EditorInfo ei = getCurrentInputEditorInfo();
+        if (ei != null) {
+            int action = ei.imeOptions & EditorInfo.IME_MASK_ACTION;
+            
+            if (action == EditorInfo.IME_ACTION_NONE || 
+                action == EditorInfo.IME_ACTION_UNSPECIFIED) {
+                // No specific action, send newline
+                ic.commitText("\n", 1);
             } else {
-                addFallbackView();
+                // Perform the action (Search, Done, Next, etc.)
+                ic.performEditorAction(action);
             }
-            
-            return mRootContainer;
-            
-        } catch (Exception e) {
-            Log.e(TAG, "CRITICAL: onCreateInputView සම්පූර්ණයෙන් අසාර්ථක විය", e);
-            // Crash වළක්වන්න minimal safe view එකක් return කරනවා
-            return createEmergencyView();
+        } else {
+            ic.commitText("\n", 1);
         }
     }
-
-    // ════════════════════════════════════════════════════════════════════
-    // ආරක්ෂිත Container සෑදීම
-    // ════════════════════════════════════════════════════════════════════
-
-    private FrameLayout createSafeContainer() {
-        // ContextThemeWrapper භාවිතයෙන් නිසි theme එකක් ලබාදෙනවා
-        // මෙය WebView crash වීම වළක්වයි
-        Context themedContext = createThemedContext();
+    
+    private void deleteWord() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return;
         
-        FrameLayout container = new FrameLayout(themedContext);
+        // Get text before cursor
+        CharSequence before = ic.getTextBeforeCursor(50, 0);
+        if (before == null || before.length() == 0) return;
         
-        // Fixed height එකක් සහිත layout params සකසනවා
-        int heightPx = dpToPx(KEYBOARD_HEIGHT_DP);
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            heightPx
-        );
-        container.setLayoutParams(params);
+        // Find last space
+        String text = before.toString();
+        int lastSpace = text.lastIndexOf(' ');
         
-        // පසුබිම් වර්ණය සකසනවා (transparent keyboard වැළැක්වීමට)
-        container.setBackgroundColor(Color.parseColor("#1a1a2e"));
-        
-        // Software rendering භාවිතයෙන් GPU driver bugs වළක්වනවා
-        container.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
-        
-        Log.d(TAG, "Container සාදන ලදී - height: " + heightPx + "px");
-        
-        return container;
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Themed Context සෑදීම - Crash Fix ප්‍රධාන තාක්ෂණය
-    // ════════════════════════════════════════════════════════════════════
-
-    private Context createThemedContext() {
-        try {
-            // InputMethodService එකට WebView වලට අවශ්‍ය theme attributes නැහැ
-            // ContextThemeWrapper භාවිතයෙන් ඒවා ලබාදෙනවා
-            return new ContextThemeWrapper(
-                this, 
-                android.R.style.Theme_DeviceDefault_NoActionBar
-            );
-        } catch (Exception e) {
-            Log.w(TAG, "ContextThemeWrapper අසාර්ථක විය, service context භාවිතා කරනවා", e);
-            return this;
+        if (lastSpace == -1) {
+            // No space, delete all
+            ic.deleteSurroundingText(text.length(), 0);
+        } else {
+            // Delete from last space to end
+            ic.deleteSurroundingText(text.length() - lastSpace - 1, 0);
         }
     }
-
-    // ════════════════════════════════════════════════════════════════════
-    // ආරක්ෂිත WebView සෑදීම
-    // ════════════════════════════════════════════════════════════════════
-
-    private WebView createSafeWebView() {
-        Context themedContext = createThemedContext();
-        
-        // WebView class එක device එකේ තිබේදැයි පරීක්ෂා කරනවා
-        try {
-            Class.forName("android.webkit.WebView");
-        } catch (ClassNotFoundException e) {
-            Log.e(TAG, "WebView class මෙම device එකේ නැත!");
-            return null;
-        }
-        
-        WebView webView;
-        
-        try {
-            webView = new WebView(themedContext);
-            Log.d(TAG, "WebView themed context එකෙන් සාදන ලදී");
-        } catch (Exception e) {
-            Log.e(TAG, "WebView constructor අසාර්ථක විය", e);
+    
+    private void refreshKeyboard() {
+        if (keyboardView != null) {
+            keyboardView.removeAllViews();
             
-            // Fallback: Application context එකෙන් උත්සාහ කරනවා
-            try {
-                webView = new WebView(getApplicationContext());
-                Log.d(TAG, "WebView application context එකෙන් සාදන ලදී");
-            } catch (Exception e2) {
-                Log.e(TAG, "WebView app context එකෙනුත් අසාර්ථක විය", e2);
-                return null;
+            String[][] layout = isNumbers ? NUMBERS : LETTERS;
+            for (int i = 0; i < layout.length; i++) {
+                keyboardView.addView(createRow(layout[i], i));
             }
         }
-        
-        // WebView settings configure කරනවා
-        configureWebViewSettings(webView);
-        
-        // WebView clients set කරනවා
-        configureWebViewClients(webView);
-        
-        // JavaScript bridge එක add කරනවා
-        addJavaScriptBridge(webView);
-        
-        return webView;
-    }
-
-    /**
-     * WebView settings ආරක්ෂිතව configure කරනවා
-     */
-    private void configureWebViewSettings(WebView webView) {
-        try {
-            WebSettings settings = webView.getSettings();
-            
-            // ═══ අත්‍යවශ්‍ය Settings ═══
-            settings.setJavaScriptEnabled(true);
-            settings.setDomStorageEnabled(true);
-            
-            // ═══ Cache Settings ═══
-            settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-            
-            // ═══ Zoom අක්‍රිය කරනවා ═══
-            settings.setSupportZoom(false);
-            settings.setBuiltInZoomControls(false);
-            settings.setDisplayZoomControls(false);
-            
-            // ═══ File Access ═══
-            settings.setAllowFileAccess(true);
-            settings.setAllowContentAccess(true);
-            
-            // ═══ Text Settings ═══
-            settings.setTextZoom(100);
-            settings.setDefaultTextEncodingName("UTF-8");
-            
-            // ═══ Layout Settings ═══
-            settings.setUseWideViewPort(true);
-            settings.setLoadWithOverviewMode(true);
-            
-            // ═══ අනවශ්‍ය features අක්‍රිය කරනවා ═══
-            settings.setGeolocationEnabled(false);
-            
-            // Safe browsing delays ඇති කරයි, අක්‍රිය කරනවා
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                settings.setSafeBrowsingEnabled(false);
-            }
-            
-            // Mixed content allow කරනවා (local files සඳහා)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-            }
-            
-            // Render priority HIGH set කරනවා (deprecated but still effective)
-            settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
-            
-            Log.d(TAG, "WebView settings සාර්ථකව configure කෙරිණි");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "WebView settings configure කිරීමේ දෝෂයක්", e);
-        }
-    }
-
-    /**
-     * WebView clients configure කරනවා
-     */
-    private void configureWebViewClients(WebView webView) {
-        try {
-            // Scrolling අක්‍රිය කරනවා - gesture conflicts වළක්වනවා
-            webView.setVerticalScrollBarEnabled(false);
-            webView.setHorizontalScrollBarEnabled(false);
-            webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
-            
-            // පසුබිම transparent කරනවා
-            webView.setBackgroundColor(Color.TRANSPARENT);
-            
-            // ═══ WebViewClient - Page loading handle කරනවා ═══
-            webView.setWebViewClient(new WebViewClient() {
-                @Override
-                public void onPageFinished(WebView view, String url) {
-                    super.onPageFinished(view, url);
-                    Log.d(TAG, "Page load සම්පූර්ණයි: " + url);
-                    mIsWebViewReady = true;
-                    
-                    // JavaScript bridge ready බව දැනුම් දෙනවා
-                    mHandler.post(() -> {
-                        try {
-                            view.evaluateJavascript(
-                                "if(typeof onBridgeReady==='function'){onBridgeReady();}",
-                                null
-                            );
-                        } catch (Exception e) {
-                            Log.e(TAG, "onBridgeReady call කිරීමේ දෝෂයක්", e);
-                        }
-                    });
-                }
-                
-                @Override
-                public void onReceivedError(WebView view, int errorCode, 
-                                            String description, String failingUrl) {
-                    Log.e(TAG, "WebView දෝෂය: " + errorCode + " - " + description);
-                    mHandler.post(() -> showErrorInWebView(description));
-                }
-                
-                @Override
-                public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                    // සියලුම navigation block කරනවා - keyboard navigate නොකළ යුතුයි
-                    return true;
-                }
-            });
-            
-            // ═══ WebChromeClient - Console logging (debugging සඳහා) ═══
-            webView.setWebChromeClient(new WebChromeClient() {
-                @Override
-                public boolean onConsoleMessage(ConsoleMessage cm) {
-                    Log.d(TAG, "JS Console: " + cm.message() + 
-                          " (line " + cm.lineNumber() + ")");
-                    return true;
-                }
-            });
-            
-            Log.d(TAG, "WebView clients configure කෙරිණි");
-            
-        } catch (Exception e) {
-            Log.e(TAG, "WebView clients configure කිරීමේ දෝෂයක්", e);
-        }
-    }
-
-    /**
-     * JavaScript Interface එක add කරනවා
-     */
-    private void addJavaScriptBridge(WebView webView) {
-        try {
-            webView.addJavascriptInterface(new AndroidBridge(), BRIDGE_NAME);
-            Log.d(TAG, "JavaScript bridge add කෙරිණි: " + BRIDGE_NAME);
-        } catch (Exception e) {
-            Log.e(TAG, "JavaScript bridge add කිරීම අසාර්ථක විය", e);
-        }
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // Fallback View (WebView අසාර්ථක වූ විට)
+    // UTILITY
     // ════════════════════════════════════════════════════════════════════
 
-    private void addFallbackView() {
-        if (mRootContainer == null) return;
-        
-        mFallbackView = new TextView(this);
-        mFallbackView.setText("⌨️ කීබෝඩ් Load කිරීම අසාර්ථක විය\n\nකරුණාකර Android System WebView update කරන්න");
-        mFallbackView.setTextColor(Color.WHITE);
-        mFallbackView.setTextSize(16);
-        mFallbackView.setGravity(Gravity.CENTER);
-        mFallbackView.setBackgroundColor(Color.parseColor("#1a1a2e"));
-        mFallbackView.setPadding(32, 32, 32, 32);
+    private void vibrate() {
+        try {
+            if (vibrator != null && vibrator.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(3, 
+                        VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    vibrator.vibrate(3);
+                }
+            }
+        } catch (Exception e) {
+            // Ignore
+        }
+    }
+    
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+    
+    private View createErrorView(String error) {
+        TextView tv = new TextView(this);
+        tv.setText("❌ Error: " + error);
+        tv.setTextColor(Color.WHITE);
+        tv.setBackgroundColor(Color.parseColor("#b71c1c"));
+        tv.setGravity(Gravity.CENTER);
+        tv.setPadding(dp(16), dp(16), dp(16), dp(16));
         
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT
+            FrameLayout.LayoutParams.MATCH_PARENT, dp(260)
         );
-        mRootContainer.addView(mFallbackView, params);
+        tv.setLayoutParams(params);
         
-        Log.w(TAG, "Fallback view පෙන්වන ලදී");
-    }
-
-    /**
-     * සියල්ල අසාර්ථක වූ විට minimal safe view එකක් return කරනවා
-     * මෙය app crash වීම වළක්වයි
-     */
-    private View createEmergencyView() {
-        TextView emergency = new TextView(this);
-        emergency.setText("⚠️ කීබෝඩ් දෝෂයක්");
-        emergency.setTextColor(Color.WHITE);
-        emergency.setGravity(Gravity.CENTER);
-        emergency.setBackgroundColor(Color.parseColor("#1a1a2e"));
-        emergency.setLayoutParams(new FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            dpToPx(KEYBOARD_HEIGHT_DP)
-        ));
-        return emergency;
-    }
-
-    /**
-     * WebView එකේ error message එකක් පෙන්වනවා
-     */
-    private void showErrorInWebView(String error) {
-        if (mWebView != null) {
-            String html = "<html><body style='background:#1a1a2e;color:white;display:flex;" +
-                         "align-items:center;justify-content:center;height:100vh;margin:0;" +
-                         "font-family:sans-serif;'>" +
-                         "<div style='text-align:center;padding:20px;'>" +
-                         "<h2>⚠️ දෝෂයක්</h2><p>" + error + "</p></div></body></html>";
-            mWebView.loadData(html, "text/html", "UTF-8");
-        }
+        return tv;
     }
 
     // ════════════════════════════════════════════════════════════════════
-    // Input View Lifecycle
+    // LIFECYCLE CALLBACKS
     // ════════════════════════════════════════════════════════════════════
 
     @Override
     public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
-        Log.d(TAG, "onStartInputView() - inputType: " + info.inputType);
+        Log.d(TAG, "✓ onStartInputView() - inputType: " + info.inputType);
         
-        if (mWebView != null && mIsWebViewReady) {
-            try {
-                int inputType = info.inputType & EditorInfo.TYPE_MASK_CLASS;
-                int imeAction = info.imeOptions & EditorInfo.IME_MASK_ACTION;
-                
-                String jsCall = String.format(
-                    "if(typeof onInputStart==='function'){onInputStart(%d,%d);}",
-                    inputType, imeAction
-                );
-                mWebView.evaluateJavascript(jsCall, null);
-            } catch (Exception e) {
-                Log.e(TAG, "JS input start notify කිරීමේ දෝෂයක්", e);
-            }
-        }
-    }
-
-    @Override
-    public void onFinishInputView(boolean finishingInput) {
-        super.onFinishInputView(finishingInput);
-        Log.d(TAG, "onFinishInputView()");
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // JavaScript Bridge - Thread-Safe Implementation
-    // ════════════════════════════════════════════════════════════════════
-
-    /**
-     * AndroidBridge - JavaScript සිට Java වෙත සන්නිවේදනය කරන Interface එක
-     * 
-     * සියලුම methods Thread-safe ලෙස ක්‍රියාත්මක වේ.
-     * UI operations Main thread එකේ execute වේ.
-     */
-    public class AndroidBridge {
-
-        /**
-         * Text එකක් input field එකට commit කරනවා
-         * @param text Commit කළ යුතු text එක
-         */
-        @JavascriptInterface
-        public void commitText(final String text) {
-            Log.d(TAG, "Bridge: commitText('" + text + "')");
-            
-            mHandler.post(() -> {
-                try {
-                    InputConnection ic = getCurrentInputConnection();
-                    if (ic != null && text != null) {
-                        ic.commitText(text, 1);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "commitText දෝෂයක්", e);
-                }
-            });
-        }
-
-        /**
-         * Cursor එකට පෙර characters delete කරනවා
-         * @param count Delete කළ යුතු characters ගණන
-         */
-        @JavascriptInterface
-        public void deleteText(final int count) {
-            Log.d(TAG, "Bridge: deleteText(" + count + ")");
-            
-            mHandler.post(() -> {
-                try {
-                    InputConnection ic = getCurrentInputConnection();
-                    if (ic != null && count > 0) {
-                        ic.deleteSurroundingText(count, 0);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "deleteText දෝෂයක්", e);
-                }
-            });
-        }
-
-        /**
-         * Raw key event එකක් send කරනවා
-         * @param keyCode Android KeyEvent code එක
-         */
-        @JavascriptInterface
-        public void sendKeyEvent(final int keyCode) {
-            Log.d(TAG, "Bridge: sendKeyEvent(" + keyCode + ")");
-            
-            mHandler.post(() -> {
-                try {
-                    InputConnection ic = getCurrentInputConnection();
-                    if (ic != null) {
-                        long now = System.currentTimeMillis();
-                        ic.sendKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0));
-                        ic.sendKeyEvent(new KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0));
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "sendKeyEvent දෝෂයක්", e);
-                }
-            });
-        }
-
-        /**
-         * Editor action එක perform කරනවා (Done, Next, Search, etc.)
-         */
-        @JavascriptInterface
-        public void performEditorAction() {
-            Log.d(TAG, "Bridge: performEditorAction()");
-            
-            mHandler.post(() -> {
-                try {
-                    InputConnection ic = getCurrentInputConnection();
-                    EditorInfo ei = getCurrentInputEditorInfo();
-                    if (ic != null && ei != null) {
-                        int action = ei.imeOptions & EditorInfo.IME_MASK_ACTION;
-                        ic.performEditorAction(action);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "performEditorAction දෝෂයක්", e);
-                }
-            });
-        }
-
-        /**
-         * Haptic feedback (vibration) කරනවා
-         * @param durationMs Vibration කාලය milliseconds වලින්
-         */
-        @JavascriptInterface
-        public void vibrate(final int durationMs) {
-            try {
-                if (mVibrator != null && mVibrator.hasVibrator()) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        mVibrator.vibrate(
-                            VibrationEffect.createOneShot(
-                                durationMs, 
-                                VibrationEffect.DEFAULT_AMPLITUDE
-                            )
-                        );
-                    } else {
-                        mVibrator.vibrate(durationMs);
-                    }
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "Vibration අසාර්ථක විය", e);
-            }
-        }
-
-        /**
-         * කීබෝඩ් එක hide කරනවා
-         */
-        @JavascriptInterface
-        public void hideKeyboard() {
-            Log.d(TAG, "Bridge: hideKeyboard()");
-            mHandler.post(() -> {
-                try {
-                    requestHideSelf(0);
-                } catch (Exception e) {
-                    Log.e(TAG, "hideKeyboard දෝෂයක්", e);
-                }
-            });
-        }
-
-        /**
-         * Debug logging සඳහා
-         * @param message Log කළ යුතු message එක
-         */
-        @JavascriptInterface
-        public void log(String message) {
-            Log.d(TAG, "JS Log: " + message);
-        }
+        // Reset state when opening
+        isShift = false;
+        isCaps = false;
         
-        /**
-         * Selected text ලබාගන්නවා
-         * @return Selected text එක හෝ empty string
-         */
-        @JavascriptInterface
-        public String getSelectedText() {
-            try {
-                InputConnection ic = getCurrentInputConnection();
-                if (ic != null) {
-                    CharSequence selected = ic.getSelectedText(0);
-                    return selected != null ? selected.toString() : "";
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "getSelectedText දෝෂයක්", e);
-            }
-            return "";
-        }
+        // Auto number mode for number inputs
+        int inputClass = info.inputType & EditorInfo.TYPE_MASK_CLASS;
+        isNumbers = (inputClass == EditorInfo.TYPE_CLASS_NUMBER || 
+                    inputClass == EditorInfo.TYPE_CLASS_PHONE);
+        
+        refreshKeyboard();
     }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Utility Methods
-    // ════════════════════════════════════════════════════════════════════
-
-    /**
-     * DP units pixels වලට convert කරනවා
-     */
-    private int dpToPx(int dp) {
-        float density = getResources().getDisplayMetrics().density;
-        return Math.round(dp * density);
-    }
-
-    // ════════════════════════════════════════════════════════════════════
-    // Cleanup - Memory Leaks වළක්වීම
-    // ════════════════════════════════════════════════════════════════════
 
     @Override
     public void onDestroy() {
-        Log.d(TAG, "onDestroy() - Service නැවැත්වෙමින්");
-        
-        cleanupWebView();
-        
-        mHandler = null;
-        mVibrator = null;
-        
+        Log.d(TAG, "✓ onDestroy()");
+        keyboardView = null;
+        vibrator = null;
         super.onDestroy();
-    }
-
-    /**
-     * WebView ආරක්ෂිතව cleanup කරනවා
-     */
-    private void cleanupWebView() {
-        if (mWebView != null) {
-            try {
-                mWebView.stopLoading();
-                mWebView.removeJavascriptInterface(BRIDGE_NAME);
-                
-                if (mRootContainer != null) {
-                    mRootContainer.removeView(mWebView);
-                }
-                
-                mWebView.clearHistory();
-                mWebView.clearCache(false);
-                mWebView.destroy();
-                
-                Log.d(TAG, "WebView cleanup සාර්ථකයි");
-            } catch (Exception e) {
-                Log.e(TAG, "WebView cleanup කිරීමේ දෝෂයක්", e);
-            }
-            mWebView = null;
-        }
-        
-        mRootContainer = null;
-        mFallbackView = null;
-        mIsWebViewReady = false;
     }
 }

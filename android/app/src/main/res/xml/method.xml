@@ -4,7 +4,7 @@
     android:settingsActivity="">
     
     <subtype
-        android:label="English (US)"
+        android:label="English"
         android:imeSubtypeLocale="en_US"
         android:imeSubtypeMode="keyboard" />
         
