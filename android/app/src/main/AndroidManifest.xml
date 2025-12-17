@@ -1,39 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- ═══════════════════════════════════════════════════════════════
+         PERMISSIONS - අවශ්‍ය permissions
+    ═══════════════════════════════════════════════════════════════════ -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/AppTheme">
+        android:theme="@style/AppTheme"
+        android:hardwareAccelerated="true">
 
+        <!-- ═══════════════════════════════════════════════════════════
+             CAPACITOR MAIN ACTIVITY (දැනටමත් ඇත - වෙනස් කරන්න එපා)
+        ═══════════════════════════════════════════════════════════════ -->
         <activity
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
-            android:label="@string/title_activity_main"
-            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:exported="true"
             android:launchMode="singleTask"
-            android:exported="true">
-
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:theme="@style/AppTheme.NoActionBarLaunch">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
 
-        <service android:name=".FastKeyboardService"
+        <!-- ═══════════════════════════════════════════════════════════
+             KEYBOARD SERVICE - මෙය ADD කරන්න
+        ═══════════════════════════════════════════════════════════════ -->
+        <service
+            android:name=".FastKeyboardService"
             android:label="@string/keyboard_name"
             android:permission="android.permission.BIND_INPUT_METHOD"
-            android:exported="true">
+            android:exported="true"
+            android:directBootAware="true">
+            
             <intent-filter>
                 <action android:name="android.view.InputMethod" />
             </intent-filter>
-            <meta-data android:name="android.view.im" android:resource="@xml/method" />
+            
+            <meta-data
+                android:name="android.view.im"
+                android:resource="@xml/method" />
         </service>
 
+        <!-- ════════════════════════════════════════════════════════════
+             Capacitor Provider (දැනටමත් ඇත - වෙනස් කරන්න එපා)
+        ════════════════════════════════════════════════════════════ -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -41,19 +60,8 @@
             android:grantUriPermissions="true">
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths"></meta-data>
+                android:resource="@xml/file_paths" />
         </provider>
+
     </application>
-
-
-    <!-- Permissions -->
-
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <uses-feature android:name="android.hardware.camera" android:required="true" />
 </manifest>

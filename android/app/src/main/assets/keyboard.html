@@ -2,637 +2,698 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no,viewport-fit=cover">
     <meta name="theme-color" content="#1a1a2e">
     <title>Fast Keyboard</title>
     <style>
-    /*═══════════════════════════════════════════════════════════════════
-      RESET & PERFORMANCE BASE
-      SECRET TRICK: Use specific selectors, avoid universal *
-    ═══════════════════════════════════════════════════════════════════*/
-    html,body,div,span{
-        margin:0;
-        padding:0;
-        border:0;
-        -webkit-tap-highlight-color:transparent;
-        -webkit-touch-callout:none;
-        -webkit-user-select:none;
-        user-select:none;
-    }
-    
-    html{
-        /* SECRET TRICK: Force GPU compositing from start */
-        transform:translateZ(0);
-        -webkit-transform:translateZ(0);
-    }
-    
-    body{
-        width:100vw;
-        height:100vh;
-        overflow:hidden;
-        touch-action:none;
-        /* SECRET TRICK: Prevent overscroll bounce */
-        overscroll-behavior:none;
-        background:linear-gradient(180deg,#1a1a2e 0%,#16162a 100%);
-        font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-        /* SECRET TRICK: Font rendering optimization */
-        -webkit-font-smoothing:antialiased;
-        text-rendering:optimizeSpeed;
-    }
-    
-    /*═══════════════════════════════════════════════════════════════════
-      KEYBOARD CONTAINER
-    ═══════════════════════════════════════════════════════════════════*/
-    #kb{
-        display:flex;
-        flex-direction:column;
-        width:100%;
-        height:100%;
-        padding:6px 3px 10px;
-        gap:6px;
-        box-sizing:border-box;
-        /* SECRET TRICK: Layout containment */
-        contain:strict;
-    }
-    
-    /*═══════════════════════════════════════════════════════════════════
-      KEYBOARD ROWS - CSS Grid Layout
-    ═══════════════════════════════════════════════════════════════════*/
-    .r{
-        display:grid;
-        gap:4px;
-        width:100%;
-        flex:1;
-        min-height:0;
-        /* Contain layout recalculations to this element */
-        contain:layout style;
-    }
-    
-    /* Row 1: Q-P (10 keys) */
-    #r1{grid-template-columns:repeat(10,1fr)}
-    
-    /* Row 2: A-L (9 keys with padding) */
-    #r2{
-        grid-template-columns:repeat(9,1fr);
-        padding:0 5%;
-    }
-    
-    /* Row 3: Shift + Z-M + Backspace */
-    #r3{grid-template-columns:1.4fr repeat(7,1fr) 1.4fr}
-    
-    /* Row 4: Symbols, Comma, Space, Period, Enter */
-    #r4{grid-template-columns:1.3fr 1fr 4fr 1fr 1.3fr}
-    
-    /*═══════════════════════════════════════════════════════════════════
-      KEY BUTTONS - High Performance Styling
-    ═══════════════════════════════════════════════════════════════════*/
-    .k{
-        display:flex;
-        align-items:center;
-        justify-content:center;
+        /* ═══════════════════════════════════════════════════════════════
+           RESET & BASE - මූලික styles
+        ═══════════════════════════════════════════════════════════════ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
         
-        min-height:44px;
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            overscroll-behavior: none;
+            background: linear-gradient(180deg, #1a1a2e 0%, #16162a 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 
+                         'Helvetica Neue', Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
         
-        background:linear-gradient(180deg,#3d3d5c 0%,#2d2d4a 100%);
-        border:none;
-        border-radius:5px;
-        box-shadow:0 1px 0 0 rgba(0,0,0,.3),
-                   0 1px 3px rgba(0,0,0,.2),
-                   inset 0 1px 0 rgba(255,255,255,.07);
+        /* ═══════════════════════════════════════════════════════════════
+           KEYBOARD CONTAINER
+        ═══════════════════════════════════════════════════════════════ */
+        #keyboard {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            height: 100%;
+            padding: 6px 4px 10px 4px;
+            gap: 6px;
+        }
         
-        color:#fff;
-        font-size:21px;
-        font-weight:500;
-        line-height:1;
+        /* ═══════════════════════════════════════════════════════════════
+           KEYBOARD ROWS - CSS Grid Layout
+        ═══════════════════════════════════════════════════════════════ */
+        .row {
+            display: grid;
+            gap: 4px;
+            width: 100%;
+            flex: 1;
+            min-height: 0;
+        }
         
-        /* CRITICAL: Prevent reflows during interaction */
-        contain:content;
+        /* Row 1: Q-P (10 keys) */
+        .row:nth-child(1) { grid-template-columns: repeat(10, 1fr); }
         
-        /* SECRET TRICK: Promote to GPU layer */
-        will-change:transform;
-        transform:translateZ(0);
-        -webkit-transform:translateZ(0);
+        /* Row 2: A-L (9 keys with padding) */
+        .row:nth-child(2) { 
+            grid-template-columns: repeat(9, 1fr);
+            padding: 0 5%;
+        }
         
-        /* Fast transitions */
-        transition:transform 40ms ease-out,background 40ms ease-out;
-    }
-    
-    /* Active/Pressed State */
-    .k.a{
-        background:linear-gradient(180deg,#5a5a8c 0%,#4a4a7a 100%);
-        transform:scale(.94) translateZ(0);
-        -webkit-transform:scale(.94) translateZ(0);
-    }
-    
-    /*═══════════════════════════════════════════════════════════════════
-      SPECIAL KEYS
-    ═══════════════════════════════════════════════════════════════════*/
-    .k.sp{
-        background:linear-gradient(180deg,#28284a 0%,#1e1e3a 100%);
-        font-size:12px;
-        font-weight:700;
-        color:#9090b0;
-        letter-spacing:.5px;
-    }
-    
-    .k.sp.a{
-        background:linear-gradient(180deg,#4040708 0%,#303060 100%);
-    }
-    
-    /* Shift Key - Caps Lock Indicator */
-    .k.sh.cl{
-        background:linear-gradient(180deg,#4080a0 0%,#306080 100%);
-        color:#00e5ff;
-    }
-    
-    /* Space Bar */
-    .k.spc{
-        background:linear-gradient(180deg,#404065 0%,#303050 100%);
-        font-size:11px;
-        letter-spacing:3px;
-        color:#8080a0;
-    }
-    
-    /* Enter Key */
-    .k.ent{
-        background:linear-gradient(180deg,#2060a0 0%,#185080 100%);
-        color:#40c4ff;
-    }
-    
-    .k.ent.a{
-        background:linear-gradient(180deg,#3080c0 0%,#2070a0 100%);
-    }
-    
-    /*═══════════════════════════════════════════════════════════════════
-      SVG ICONS
-    ═══════════════════════════════════════════════════════════════════*/
-    .k svg{
-        width:24px;
-        height:24px;
-        fill:currentColor;
-        /* SECRET TRICK: Prevent icon from receiving touch events */
-        pointer-events:none;
-    }
-    
-    /*═══════════════════════════════════════════════════════════════════
-      KEY POPUP PREVIEW
-    ═══════════════════════════════════════════════════════════════════*/
-    #pop{
-        position:fixed;
-        display:none;
-        align-items:center;
-        justify-content:center;
+        /* Row 3: Shift + Z-M + Backspace */
+        .row:nth-child(3) { grid-template-columns: 1.4fr repeat(7, 1fr) 1.4fr; }
         
-        width:52px;
-        height:66px;
-        margin-left:-26px;
-        margin-top:-66px;
+        /* Row 4: Symbols, Comma, Space, Period, Enter */
+        .row:nth-child(4) { grid-template-columns: 1.3fr 1fr 4fr 1fr 1.3fr; }
         
-        background:linear-gradient(180deg,#6060a0 0%,#505090 100%);
-        border-radius:8px;
-        box-shadow:0 8px 24px rgba(0,0,0,.4);
+        /* ═══════════════════════════════════════════════════════════════
+           KEY BUTTONS - ප්‍රධාන key styling
+        ═══════════════════════════════════════════════════════════════ */
+        .key {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 44px;
+            background: linear-gradient(180deg, #3d3d5c 0%, #2d2d4a 100%);
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 1px 0 0 rgba(0,0,0,0.3),
+                       0 1px 3px rgba(0,0,0,0.2),
+                       inset 0 1px 0 rgba(255,255,255,0.07);
+            color: #ffffff;
+            font-size: 21px;
+            font-weight: 500;
+            line-height: 1;
+            cursor: pointer;
+            transition: transform 50ms ease-out, background 50ms ease-out;
+            contain: content;
+            will-change: transform;
+        }
         
-        color:#fff;
-        font-size:36px;
-        font-weight:600;
+        /* Active/Pressed State */
+        .key.active {
+            background: linear-gradient(180deg, #5a5a8c 0%, #4a4a7a 100%);
+            transform: scale(0.92);
+        }
         
-        pointer-events:none;
-        z-index:9999;
+        /* ═══════════════════════════════════════════════════════════════
+           SPECIAL KEYS - විශේෂ keys
+        ═══════════════════════════════════════════════════════════════ */
+        .key.special {
+            background: linear-gradient(180deg, #28284a 0%, #1e1e3a 100%);
+            font-size: 12px;
+            font-weight: 700;
+            color: #9090b0;
+            letter-spacing: 0.5px;
+        }
         
-        contain:layout style paint;
-        will-change:transform,opacity;
-        transform:translateZ(0);
-    }
-    
-    #pop.v{
-        display:flex;
-        animation:popUp 60ms ease-out;
-    }
-    
-    @keyframes popUp{
-        from{opacity:0;transform:scale(.7) translateZ(0)}
-        to{opacity:1;transform:scale(1) translateZ(0)}
-    }
-    
-    /*═══════════════════════════════════════════════════════════════════
-      NUMBER ROW (When in number mode)
-    ═══════════════════════════════════════════════════════════════════*/
-    .k.num{
-        font-size:20px;
-        font-weight:600;
-    }
+        .key.special.active {
+            background: linear-gradient(180deg, #404068 0%, #303050 100%);
+        }
+        
+        /* Shift Key - Active/Caps Lock */
+        .key.shift.shifted {
+            background: linear-gradient(180deg, #4080a0 0%, #306080 100%);
+            color: #00e5ff;
+        }
+        
+        /* Space Bar */
+        .key.space {
+            background: linear-gradient(180deg, #404065 0%, #303050 100%);
+            font-size: 11px;
+            letter-spacing: 3px;
+            color: #8080a0;
+        }
+        
+        /* Enter Key */
+        .key.enter {
+            background: linear-gradient(180deg, #2060a0 0%, #185080 100%);
+            color: #40c4ff;
+        }
+        
+        .key.enter.active {
+            background: linear-gradient(180deg, #3080c0 0%, #2070a0 100%);
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           SVG ICONS
+        ═══════════════════════════════════════════════════════════════ */
+        .key svg {
+            width: 22px;
+            height: 22px;
+            fill: currentColor;
+            pointer-events: none;
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           KEY POPUP PREVIEW
+        ═══════════════════════════════════════════════════════════════ */
+        #popup {
+            position: fixed;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 52px;
+            height: 66px;
+            background: linear-gradient(180deg, #6060a0 0%, #505090 100%);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+            color: #ffffff;
+            font-size: 36px;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translateX(-50%);
+        }
+        
+        #popup.visible {
+            display: flex;
+            animation: popUp 80ms ease-out;
+        }
+        
+        @keyframes popUp {
+            from { opacity: 0; transform: translateX(-50%) scale(0.7); }
+            to { opacity: 1; transform: translateX(-50%) scale(1); }
+        }
+        
+        /* ═══════════════════════════════════════════════════════════════
+           DEBUG STATUS BAR (production එකේදී hide කරන්න)
+        ═══════════════════════════════════════════════════════════════ */
+        #debug {
+            display: none; /* 'flex' කරන්න debugging වලට */
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 2px 8px;
+            background: rgba(0,0,0,0.8);
+            color: #0f0;
+            font-size: 9px;
+            font-family: monospace;
+            z-index: 10000;
+        }
     </style>
 </head>
 <body>
-    <div id="kb">
-        <div class="r" id="r1"></div>
-        <div class="r" id="r2"></div>
-        <div class="r" id="r3"></div>
-        <div class="r" id="r4"></div>
-    </div>
-    <div id="pop"></div>
+    <!-- Debug Bar -->
+    <div id="debug">Initializing...</div>
+    
+    <!-- Keyboard Container -->
+    <div id="keyboard"></div>
+    
+    <!-- Key Popup Preview -->
+    <div id="popup"></div>
 
 <script>
-(function(){
-'use strict';
+(function() {
+    'use strict';
 
-/*═══════════════════════════════════════════════════════════════════════
-  CONFIGURATION
-═══════════════════════════════════════════════════════════════════════*/
-const CFG = {
-    VIBRATE: 3,           // Haptic duration (ms)
-    POPUP_Y: -70,         // Popup offset from key
-    HOLD_DELAY: 400,      // Long press threshold
-    REPEAT_MS: 45,        // Key repeat interval
-    DBL_TAP: 280          // Double-tap for caps lock
-};
-
-/*═══════════════════════════════════════════════════════════════════════
-  MOCK BRIDGE FOR BROWSER TESTING
-═══════════════════════════════════════════════════════════════════════*/
-const Bridge = {
-    commitText: function(t) {
-        if (window.AndroidBridge) {
-            window.AndroidBridge.commitText(t);
-        } else {
-            console.log('✏️ Typed:', t);
-            // Visual feedback in browser
-            document.title = 'Typed: ' + t;
-        }
-    },
-    deleteText: function(n) {
-        if (window.AndroidBridge) {
-            window.AndroidBridge.deleteText(n);
-        } else {
-            console.log('⌫ Delete:', n);
-        }
-    },
-    performAction: function() {
-        if (window.AndroidBridge) {
-            window.AndroidBridge.performEditorAction();
-        } else {
-            console.log('↵ Enter/Action');
-        }
-    },
-    vibrate: function(d) {
-        if (window.AndroidBridge) {
-            window.AndroidBridge.vibrate(d);
-        } else if (navigator.vibrate) {
-            navigator.vibrate(d);
-        }
-    },
-    hideKeyboard: function() {
-        if (window.AndroidBridge) {
-            window.AndroidBridge.hideKeyboard();
-        } else {
-            console.log('⌨️ Hide Keyboard');
-        }
-    }
-};
-
-/*═══════════════════════════════════════════════════════════════════════
-  STATE MANAGEMENT
-═══════════════════════════════════════════════════════════════════════*/
-const S = {
-    shift: false,
-    caps: false,
-    sym: 0,              // 0=letters, 1=symbols1, 2=symbols2
-    active: null,
-    holdTmr: null,
-    repTmr: null,
-    lastShift: 0
-};
-
-/*═══════════════════════════════════════════════════════════════════════
-  KEYBOARD LAYOUTS
-═══════════════════════════════════════════════════════════════════════*/
-const L = {
-    abc: {
-        r1: 'qwertyuiop'.split(''),
-        r2: 'asdfghjkl'.split(''),
-        r3: ['⇧','z','x','c','v','b','n','m','⌫'],
-        r4: ['123',',','␣','.','↵']
-    },
-    sym1: {
-        r1: '1234567890'.split(''),
-        r2: '@#$%&-+()'.split(''),
-        r3: ['#+=','*','"',"'",':',';','!','?','⌫'],
-        r4: ['ABC',',','␣','.','↵']
-    },
-    sym2: {
-        r1: '~`|•√π÷×¶∆'.split(''),
-        r2: '£€¥^°={}\\'.split(''),
-        r3: ['123','©','®','™','✓','[',']','<','⌫'],
-        r4: ['ABC',',','␣','.','↵']
-    }
-};
-
-/*═══════════════════════════════════════════════════════════════════════
-  DOM CACHE - Avoid repeated queries
-═══════════════════════════════════════════════════════════════════════*/
-const D = {
-    kb: null,
-    rows: [],
-    pop: null
-};
-
-/*═══════════════════════════════════════════════════════════════════════
-  ICONS (Inline SVG for performance)
-═══════════════════════════════════════════════════════════════════════*/
-const ICO = {
-    shift: '<svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>',
-    del: '<svg viewBox="0 0 24 24"><path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/></svg>',
-    enter: '<svg viewBox="0 0 24 24"><path d="M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7z"/></svg>'
-};
-
-/*═══════════════════════════════════════════════════════════════════════
-  INITIALIZATION
-═══════════════════════════════════════════════════════════════════════*/
-function init() {
-    D.kb = document.getElementById('kb');
-    D.pop = document.getElementById('pop');
-    D.rows = [
-        document.getElementById('r1'),
-        document.getElementById('r2'),
-        document.getElementById('r3'),
-        document.getElementById('r4')
-    ];
+    // ═══════════════════════════════════════════════════════════════════════
+    // CONFIGURATION - වින්‍යාසය
+    // ═══════════════════════════════════════════════════════════════════════
     
-    render();
-    bind();
-}
+    var CONFIG = {
+        VIBRATE_MS: 3,          // Haptic feedback කාලය (ms)
+        HOLD_DELAY: 400,        // Long press threshold (ms)
+        REPEAT_INTERVAL: 50,    // Key repeat interval (ms)
+        DBL_TAP_MS: 280         // Double-tap for caps lock (ms)
+    };
 
-/*═══════════════════════════════════════════════════════════════════════
-  RENDERING - Uses DocumentFragment for batch DOM updates
-═══════════════════════════════════════════════════════════════════════*/
-function render() {
-    const layout = S.sym === 0 ? L.abc : (S.sym === 1 ? L.sym1 : L.sym2);
-    const rows = ['r1', 'r2', 'r3', 'r4'];
+    // ═══════════════════════════════════════════════════════════════════════
+    // MOCK BRIDGE - Browser Testing සඳහා
+    // Android Bridge නැතිනම් console.log භාවිතා කරනවා
+    // ═══════════════════════════════════════════════════════════════════════
     
-    rows.forEach((rid, i) => {
-        const row = D.rows[i];
-        const frag = document.createDocumentFragment();
+    var Bridge = {
+        isAndroid: typeof window.AndroidBridge !== 'undefined',
         
-        layout[rid].forEach(k => {
-            frag.appendChild(createKey(k));
+        commitText: function(text) {
+            if (this.isAndroid) {
+                window.AndroidBridge.commitText(text);
+            } else {
+                console.log('📝 commitText:', text);
+                debug('Typed: ' + text);
+            }
+        },
+        
+        deleteText: function(count) {
+            if (this.isAndroid) {
+                window.AndroidBridge.deleteText(count);
+            } else {
+                console.log('⌫ deleteText:', count);
+                debug('Delete: ' + count);
+            }
+        },
+        
+        performAction: function() {
+            if (this.isAndroid) {
+                window.AndroidBridge.performEditorAction();
+            } else {
+                console.log('↵ performAction');
+                debug('Enter pressed');
+            }
+        },
+        
+        vibrate: function(ms) {
+            if (this.isAndroid) {
+                window.AndroidBridge.vibrate(ms);
+            } else if (navigator.vibrate) {
+                navigator.vibrate(ms);
+            }
+        },
+        
+        hideKeyboard: function() {
+            if (this.isAndroid) {
+                window.AndroidBridge.hideKeyboard();
+            } else {
+                console.log('⌨️ hideKeyboard');
+            }
+        },
+        
+        log: function(msg) {
+            if (this.isAndroid) {
+                window.AndroidBridge.log(msg);
+            }
+            console.log('[KB]', msg);
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // STATE - කීබෝඩ් තත්වය
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    var state = {
+        shift: false,       // Shift key active ද
+        caps: false,        // Caps lock on ද
+        mode: 'letters',    // 'letters', 'numbers', 'symbols'
+        lastShiftTime: 0    // Double-tap detection සඳහා
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // KEYBOARD LAYOUTS - කීබෝඩ් layouts
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    var layouts = {
+        letters: [
+            ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'],
+            ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'],
+            ['SHIFT', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'BACKSPACE'],
+            ['123', ',', 'SPACE', '.', 'ENTER']
+        ],
+        numbers: [
+            ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'],
+            ['@', '#', '$', '%', '&', '-', '+', '(', ')'],
+            ['#+=', '*', '"', "'", ':', ';', '!', '?', 'BACKSPACE'],
+            ['ABC', ',', 'SPACE', '.', 'ENTER']
+        ],
+        symbols: [
+            ['~', '`', '|', '•', '√', 'π', '÷', '×', '¶', '∆'],
+            ['£', '€', '¥', '^', '°', '=', '{', '}', '\\'],
+            ['123', '©', '®', '™', '✓', '[', ']', '<', 'BACKSPACE'],
+            ['ABC', ',', 'SPACE', '.', 'ENTER']
+        ]
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SVG ICONS - Key icons
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    var icons = {
+        SHIFT: '<svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg>',
+        BACKSPACE: '<svg viewBox="0 0 24 24"><path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/></svg>',
+        ENTER: '<svg viewBox="0 0 24 24"><path d="M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7z"/></svg>'
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DOM ELEMENTS CACHE
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    var elements = {
+        keyboard: null,
+        popup: null,
+        debugEl: null
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // TOUCH STATE
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    var touch = {
+        activeKey: null,
+        holdTimer: null,
+        repeatTimer: null
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // DEBUG HELPER
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    function debug(msg) {
+        if (elements.debugEl) {
+            elements.debugEl.textContent = msg;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // RENDERING - UI Rendering
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    function render() {
+        if (!elements.keyboard) return;
+        
+        var layout = layouts[state.mode];
+        var html = '';
+        
+        layout.forEach(function(row) {
+            html += '<div class="row">';
+            row.forEach(function(key) {
+                html += createKeyHTML(key);
+            });
+            html += '</div>';
         });
         
-        // SECRET TRICK: Replace innerHTML in one operation
-        row.innerHTML = '';
-        row.appendChild(frag);
-    });
-}
-
-function createKey(k) {
-    const el = document.createElement('div');
-    el.className = 'k';
-    el.dataset.k = k;
-    
-    switch(k) {
-        case '⇧':
-            el.classList.add('sp', 'sh');
-            el.innerHTML = ICO.shift;
-            if (S.caps) el.classList.add('cl');
-            break;
-        case '⌫':
-            el.classList.add('sp', 'bs');
-            el.innerHTML = ICO.del;
-            break;
-        case '↵':
-            el.classList.add('sp', 'ent');
-            el.innerHTML = ICO.enter;
-            break;
-        case '␣':
-            el.classList.add('spc');
-            el.textContent = 'space';
-            break;
-        case '123':
-        case '#+=':
-        case 'ABC':
-            el.classList.add('sp');
-            el.textContent = k;
-            break;
-        default:
-            // Apply shift/caps transformation
-            el.textContent = (S.shift || S.caps) && /^[a-z]$/.test(k) 
-                ? k.toUpperCase() 
-                : k;
-            // Number styling
-            if (/^[0-9]$/.test(k)) el.classList.add('num');
+        elements.keyboard.innerHTML = html;
+        Bridge.log('Keyboard rendered: ' + state.mode);
     }
     
-    return el;
-}
-
-/*═══════════════════════════════════════════════════════════════════════
-  EVENT BINDING - Ultra-Fast Touch Handling
-═══════════════════════════════════════════════════════════════════════*/
-function bind() {
-    const opts = { passive: false, capture: true };
-    
-    // Touch events (mobile)
-    D.kb.addEventListener('touchstart', onDown, opts);
-    D.kb.addEventListener('touchend', onUp, opts);
-    D.kb.addEventListener('touchcancel', onUp, opts);
-    
-    // Mouse events (desktop testing)
-    D.kb.addEventListener('mousedown', onDown, opts);
-    D.kb.addEventListener('mouseup', onUp, opts);
-    D.kb.addEventListener('mouseleave', onUp, opts);
-    
-    // Prevent context menu
-    D.kb.addEventListener('contextmenu', e => e.preventDefault(), opts);
-}
-
-function onDown(e) {
-    e.preventDefault();
-    
-    // Get touch/click coordinates
-    const x = e.touches ? e.touches[0].clientX : e.clientX;
-    const y = e.touches ? e.touches[0].clientY : e.clientY;
-    
-    // SECRET TRICK: elementFromPoint is faster than event.target for touch
-    const target = document.elementFromPoint(x, y);
-    const key = target?.closest('.k');
-    
-    if (!key) return;
-    
-    const k = key.dataset.k;
-    if (!k) return;
-    
-    // Visual feedback
-    key.classList.add('a');
-    S.active = key;
-    
-    // Haptic feedback
-    Bridge.vibrate(CFG.VIBRATE);
-    
-    // Show popup for letter/number keys
-    if (k.length === 1 && k !== '␣') {
-        showPop(key, (S.shift || S.caps) && /^[a-z]$/.test(k) ? k.toUpperCase() : k);
+    function createKeyHTML(key) {
+        var classes = ['key'];
+        var content = '';
+        var dataKey = key;
+        
+        switch (key) {
+            case 'SHIFT':
+                classes.push('special', 'shift');
+                if (state.shift || state.caps) classes.push('shifted');
+                content = icons.SHIFT;
+                break;
+                
+            case 'BACKSPACE':
+                classes.push('special');
+                content = icons.BACKSPACE;
+                break;
+                
+            case 'ENTER':
+                classes.push('special', 'enter');
+                content = icons.ENTER;
+                break;
+                
+            case 'SPACE':
+                classes.push('space');
+                content = 'space';
+                break;
+                
+            case '123':
+            case '#+=':
+            case 'ABC':
+                classes.push('special');
+                content = key;
+                break;
+                
+            default:
+                // Regular character
+                var displayChar = key;
+                if ((state.shift || state.caps) && /^[a-z]$/.test(key)) {
+                    displayChar = key.toUpperCase();
+                }
+                content = displayChar;
+        }
+        
+        return '<div class="' + classes.join(' ') + '" data-key="' + dataKey + '">' + 
+               content + '</div>';
     }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // KEY PRESS HANDLING - Key press handling
+    // ═══════════════════════════════════════════════════════════════════════
     
-    // Handle key action
-    handleKey(k);
-    
-    // Setup long-press repeat for backspace
-    if (k === '⌫') {
-        S.holdTmr = setTimeout(() => {
-            S.repTmr = setInterval(() => {
+    function handleKeyPress(key) {
+        Bridge.vibrate(CONFIG.VIBRATE_MS);
+        
+        switch (key) {
+            case 'SHIFT':
+                handleShift();
+                break;
+                
+            case 'BACKSPACE':
                 Bridge.deleteText(1);
-                Bridge.vibrate(CFG.VIBRATE);
-            }, CFG.REPEAT_MS);
-        }, CFG.HOLD_DELAY);
-    }
-}
-
-function onUp(e) {
-    e.preventDefault();
-    
-    // Clear active state
-    if (S.active) {
-        S.active.classList.remove('a');
-        S.active = null;
-    }
-    
-    // Clear timers
-    clearTimeout(S.holdTmr);
-    clearInterval(S.repTmr);
-    S.holdTmr = null;
-    S.repTmr = null;
-    
-    // Hide popup
-    hidePop();
-}
-
-/*═══════════════════════════════════════════════════════════════════════
-  KEY ACTION HANDLER
-═══════════════════════════════════════════════════════════════════════*/
-function handleKey(k) {
-    switch(k) {
-        case '⇧':
-            doShift();
-            break;
-        case '⌫':
-            Bridge.deleteText(1);
-            break;
-        case '↵':
-            Bridge.performAction();
-            break;
-        case '␣':
-            Bridge.commitText(' ');
-            break;
-        case '123':
-            S.sym = 1;
-            render();
-            break;
-        case '#+=':
-            S.sym = 2;
-            render();
-            break;
-        case 'ABC':
-            S.sym = 0;
-            render();
-            break;
-        default:
-            // Regular character
-            let chr = k;
-            if ((S.shift || S.caps) && /^[a-z]$/.test(k)) {
-                chr = k.toUpperCase();
-            }
-            Bridge.commitText(chr);
-            
-            // Auto-unshift (unless caps lock)
-            if (S.shift && !S.caps) {
-                S.shift = false;
-                updateShift();
-            }
-    }
-}
-
-function doShift() {
-    const now = Date.now();
-    
-    if (now - S.lastShift < CFG.DBL_TAP) {
-        // Double-tap = toggle caps lock
-        S.caps = !S.caps;
-        S.shift = S.caps;
-    } else {
-        // Single tap
-        if (S.caps) {
-            S.caps = false;
-            S.shift = false;
-        } else {
-            S.shift = !S.shift;
+                break;
+                
+            case 'ENTER':
+                Bridge.performAction();
+                break;
+                
+            case 'SPACE':
+                Bridge.commitText(' ');
+                autoUnshift();
+                break;
+                
+            case '123':
+                state.mode = 'numbers';
+                render();
+                break;
+                
+            case '#+=':
+                state.mode = 'symbols';
+                render();
+                break;
+                
+            case 'ABC':
+                state.mode = 'letters';
+                render();
+                break;
+                
+            default:
+                // Regular character
+                var char = key;
+                if ((state.shift || state.caps) && /^[a-z]$/.test(key)) {
+                    char = key.toUpperCase();
+                }
+                Bridge.commitText(char);
+                autoUnshift();
         }
     }
     
-    S.lastShift = now;
-    updateShift();
-}
-
-function updateShift() {
-    // Update letter keys
-    D.rows.forEach((row, i) => {
-        if (i > 2) return; // Skip row 4
+    function handleShift() {
+        var now = Date.now();
         
-        row.querySelectorAll('.k').forEach(key => {
-            const k = key.dataset.k;
-            if (k && /^[a-z]$/.test(k)) {
-                key.textContent = (S.shift || S.caps) ? k.toUpperCase() : k;
+        if (now - state.lastShiftTime < CONFIG.DBL_TAP_MS) {
+            // Double-tap = Caps lock toggle
+            state.caps = !state.caps;
+            state.shift = state.caps;
+            Bridge.log('Caps lock: ' + (state.caps ? 'ON' : 'OFF'));
+        } else {
+            // Single tap
+            if (state.caps) {
+                state.caps = false;
+                state.shift = false;
+            } else {
+                state.shift = !state.shift;
+            }
+        }
+        
+        state.lastShiftTime = now;
+        updateShiftKeys();
+    }
+    
+    function autoUnshift() {
+        if (state.shift && !state.caps) {
+            state.shift = false;
+            updateShiftKeys();
+        }
+    }
+    
+    function updateShiftKeys() {
+        // Update all letter keys
+        var keys = elements.keyboard.querySelectorAll('.key');
+        keys.forEach(function(keyEl) {
+            var key = keyEl.getAttribute('data-key');
+            
+            if (/^[a-z]$/.test(key)) {
+                keyEl.textContent = (state.shift || state.caps) ? 
+                                    key.toUpperCase() : key;
+            }
+            
+            if (key === 'SHIFT') {
+                if (state.shift || state.caps) {
+                    keyEl.classList.add('shifted');
+                } else {
+                    keyEl.classList.remove('shifted');
+                }
             }
         });
-    });
-    
-    // Update shift key appearance
-    const shiftKey = D.rows[2].querySelector('.sh');
-    if (shiftKey) {
-        shiftKey.classList.toggle('cl', S.caps);
     }
-}
 
-/*═══════════════════════════════════════════════════════════════════════
-  POPUP PREVIEW
-═══════════════════════════════════════════════════════════════════════*/
-function showPop(key, chr) {
-    const r = key.getBoundingClientRect();
-    D.pop.textContent = chr;
-    D.pop.style.left = (r.left + r.width / 2) + 'px';
-    D.pop.style.top = (r.top) + 'px';
-    D.pop.classList.add('v');
-}
-
-function hidePop() {
-    D.pop.classList.remove('v');
-}
-
-/*═══════════════════════════════════════════════════════════════════════
-  BRIDGE CALLBACKS (Called from Java)
-═══════════════════════════════════════════════════════════════════════*/
-window.onBridgeReady = function() {
-    console.log('🚀 Android Bridge Ready');
-};
-
-window.onInputStart = function(inputType, imeAction) {
-    // Handle different input types
-    // inputType: 0=none, 1=text, 2=number, 3=phone, 4=datetime, 5=date, 6=time
-    console.log('📝 Input Type:', inputType, 'Action:', imeAction);
+    // ═══════════════════════════════════════════════════════════════════════
+    // POPUP PREVIEW - Key popup
+    // ═══════════════════════════════════════════════════════════════════════
     
-    // Auto-switch to number pad for number input types
-    if (inputType === 2 || inputType === 3) {
-        S.sym = 1;
-        render();
+    function showPopup(keyEl, char) {
+        if (!elements.popup || !keyEl) return;
+        if (char.length !== 1) return; // Only for single characters
+        
+        var rect = keyEl.getBoundingClientRect();
+        elements.popup.textContent = char;
+        elements.popup.style.left = (rect.left + rect.width / 2) + 'px';
+        elements.popup.style.top = (rect.top - 10) + 'px';
+        elements.popup.classList.add('visible');
     }
-};
+    
+    function hidePopup() {
+        if (elements.popup) {
+            elements.popup.classList.remove('visible');
+        }
+    }
 
-/*═══════════════════════════════════════════════════════════════════════
-  STARTUP
-═══════════════════════════════════════════════════════════════════════*/
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-} else {
-    init();
-}
+    // ═══════════════════════════════════════════════════════════════════════
+    // EVENT HANDLING - Touch/Mouse events
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    function onPointerDown(e) {
+        e.preventDefault();
+        
+        // Get the key element
+        var target = e.target;
+        while (target && !target.classList.contains('key')) {
+            target = target.parentElement;
+        }
+        
+        if (!target) return;
+        
+        var key = target.getAttribute('data-key');
+        if (!key) return;
+        
+        // Visual feedback
+        target.classList.add('active');
+        touch.activeKey = target;
+        
+        // Handle key press
+        handleKeyPress(key);
+        
+        // Show popup for letters/numbers
+        if (key.length === 1 || /^[a-z]$/.test(key)) {
+            var displayChar = key;
+            if ((state.shift || state.caps) && /^[a-z]$/.test(key)) {
+                displayChar = key.toUpperCase();
+            }
+            showPopup(target, displayChar);
+        }
+        
+        // Setup long-press repeat for backspace
+        if (key === 'BACKSPACE') {
+            touch.holdTimer = setTimeout(function() {
+                touch.repeatTimer = setInterval(function() {
+                    Bridge.deleteText(1);
+                    Bridge.vibrate(2);
+                }, CONFIG.REPEAT_INTERVAL);
+            }, CONFIG.HOLD_DELAY);
+        }
+    }
+    
+    function onPointerUp(e) {
+        e.preventDefault();
+        
+        // Clear active state
+        if (touch.activeKey) {
+            touch.activeKey.classList.remove('active');
+            touch.activeKey = null;
+        }
+        
+        // Clear timers
+        clearTimeout(touch.holdTimer);
+        clearInterval(touch.repeatTimer);
+        touch.holdTimer = null;
+        touch.repeatTimer = null;
+        
+        // Hide popup
+        hidePopup();
+    }
+    
+    function bindEvents() {
+        var kb = elements.keyboard;
+        if (!kb) return;
+        
+        // Touch events (mobile)
+        kb.addEventListener('touchstart', onPointerDown, { passive: false });
+        kb.addEventListener('touchend', onPointerUp, { passive: false });
+        kb.addEventListener('touchcancel', onPointerUp, { passive: false });
+        
+        // Mouse events (desktop testing)
+        kb.addEventListener('mousedown', onPointerDown, { passive: false });
+        kb.addEventListener('mouseup', onPointerUp, { passive: false });
+        kb.addEventListener('mouseleave', onPointerUp, { passive: false });
+        
+        // Prevent context menu
+        kb.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+        
+        Bridge.log('Events bound successfully');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // BRIDGE CALLBACKS - Java සිට call කරන functions
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    window.onBridgeReady = function() {
+        Bridge.log('Android Bridge ready!');
+        debug('Bridge Ready ✓');
+    };
+    
+    window.onInputStart = function(inputType, imeAction) {
+        Bridge.log('Input started - type: ' + inputType + ', action: ' + imeAction);
+        
+        // Number input type = auto switch to numbers
+        if (inputType === 2 || inputType === 3) {
+            state.mode = 'numbers';
+            render();
+        }
+    };
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // INITIALIZATION - ආරම්භය
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    function init() {
+        try {
+            Bridge.log('Initializing keyboard...');
+            
+            // Cache DOM elements
+            elements.keyboard = document.getElementById('keyboard');
+            elements.popup = document.getElementById('popup');
+            elements.debugEl = document.getElementById('debug');
+            
+            if (!elements.keyboard) {
+                throw new Error('Keyboard container not found!');
+            }
+            
+            // Render keyboard
+            render();
+            
+            // Bind events
+            bindEvents();
+            
+            // Update debug
+            debug(Bridge.isAndroid ? 'Android Mode ✓' : 'Browser Mode (Testing)');
+            
+            Bridge.log('Keyboard initialized successfully');
+            
+        } catch (error) {
+            console.error('Keyboard init error:', error);
+            debug('Error: ' + error.message);
+            Bridge.log('Init error: ' + error.message);
+        }
+    }
+    
+    // Start when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 
 })();
 </script>
