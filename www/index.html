@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f0f1a">
+    <title>Fast Keyboard</title>
+    <style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(180deg, #0f0f1a 0%, #1a1a2e 100%);
+    color: #fff;
+    min-height: 100vh;
+    padding: 24px;
+    padding-top: env(safe-area-inset-top, 24px);
+    padding-bottom: env(safe-area-inset-bottom, 24px);
+}
+
+.container {
+    max-width: 480px;
+    margin: 0 auto;
+}
+
+/* Header */
+.header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.logo {
+    font-size: 64px;
+    margin-bottom: 16px;
+}
+
+h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    color: rgba(255,255,255,0.6);
+    font-size: 16px;
+}
+
+/* Status Card */
+.status-card {
+    background: rgba(255,255,255,0.05);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.status-row:last-child {
+    border-bottom: none;
+}
+
+.status-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 15px;
+}
+
+.status-icon {
+    font-size: 20px;
+}
+
+.status-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 20px;
+}
+
+.status-value.enabled {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.status-value.disabled {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+.status-value.active {
+    background: rgba(59, 130, 246, 0.2);
+    color: #3b82f6;
+}
+
+/* Setup Steps */
+.steps {
+    margin-bottom: 32px;
+}
+
+.step {
+    display: flex;
+    gap: 16px;
+    padding: 20px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    margin-bottom: 12px;
+    border: 1px solid rgba(255,255,255,0.05);
+    transition: all 0.3s ease;
+}
+
+.step:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.1);
+}
+
+.step-number {
+    width: 32px;
+    height: 32px;
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.step-number.done {
+    background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+}
+
+.step-content h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.step-content p {
+    font-size: 14px;
+    color: rgba(255,255,255,0.6);
+    line-height: 1.5;
+}
+
+/* Buttons */
+.btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 16px 24px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 12px;
+}
+
+.btn-primary {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    color: #fff;
+}
+
+.btn-primary:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+.btn-secondary {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+}
+
+.btn-secondary:active {
+    background: rgba(255,255,255,0.15);
+}
+
+.btn-icon {
+    font-size: 20px;
+}
+
+/* Test Area */
+.test-area {
+    margin-top: 32px;
+    padding: 24px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 16px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+.test-area h3 {
+    font-size: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.test-input {
+    width: 100%;
+    padding: 16px;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    color: #fff;
+    font-size: 16px;
+    outline: none;
+}
+
+.test-input:focus {
+    border-color: #3b82f6;
+}
+
+.test-input::placeholder {
+    color: rgba(255,255,255,0.3);
+}
+
+/* Footer */
+.footer {
+    margin-top: 40px;
+    text-align: center;
+    color: rgba(255,255,255,0.4);
+    font-size: 13px;
+}
+
+/* Loading */
+.loading {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">⌨️</div>
+            <h1>Fast Keyboard</h1>
+            <p class="subtitle">High-Performance Hybrid Keyboard</p>
+        </div>
+        
+        <!-- Status Card -->
+        <div class="status-card">
+            <div class="status-row">
+                <div class="status-label">
+                    <span class="status-icon">⚙️</span>
+                    <span>Keyboard Enabled</span>
+                </div>
+                <div class="status-value disabled" id="statusEnabled">
+                    <span class="loading"></span>
+                    Checking...
+                </div>
+            </div>
+            <div class="status-row">
+                <div class="status-label">
+                    <span class="status-icon">✓</span>
+                    <span>Active Keyboard</span>
+                </div>
+                <div class="status-value disabled" id="statusActive">
+                    <span class="loading"></span>
+                    Checking...
+                </div>
+            </div>
+        </div>
+        
+        <!-- Setup Steps -->
+        <div class="steps">
+            <div class="step" id="step1">
+                <div class="step-number">1</div>
+                <div class="step-content">
+                    <h3>Enable Keyboard</h3>
+                    <p>Settings වලින් Fast Keyboard enable කරන්න</p>
+                </div>
+            </div>
+            
+            <div class="step" id="step2">
+                <div class="step-number">2</div>
+                <div class="step-content">
+                    <h3>Select Keyboard</h3>
+                    <p>Default keyboard එක Fast Keyboard ලෙස select කරන්න</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Buttons -->
+        <button class="btn btn-primary" onclick="openKeyboardSettings()">
+            <span class="btn-icon">⚙️</span>
+            Open Keyboard Settings
+        </button>
+        
+        <button class="btn btn-secondary" onclick="showKeyboardPicker()">
+            <span class="btn-icon">🔄</span>
+            Switch to Fast Keyboard
+        </button>
+        
+        <!-- Test Area -->
+        <div class="test-area">
+            <h3>🧪 Test Keyboard</h3>
+            <input type="text" class="test-input" placeholder="Tap here to test keyboard...">
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>Version 1.0.0</p>
+        </div>
+    </div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// KEYBOARD SETUP FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Open keyboard settings
+function openKeyboardSettings() {
+    if (window.KeyboardSetup) {
+        KeyboardSetup.openKeyboardSettings();
+    } else {
+        // Fallback - show instructions
+        alert('Settings → System → Languages & input → On-screen keyboard → Manage keyboards → Enable "Fast Keyboard"');
+    }
+}
+
+// Show keyboard picker
+function showKeyboardPicker() {
+    if (window.KeyboardSetup) {
+        KeyboardSetup.showKeyboardPicker();
+    } else {
+        // Fallback
+        alert('Text field එකක් tap කරලා, navigation bar එකේ keyboard icon එක tap කරන්න');
+    }
+}
+
+// Check keyboard status
+function checkStatus() {
+    if (window.KeyboardSetup) {
+        // Check if enabled
+        const isEnabled = KeyboardSetup.isKeyboardEnabled();
+        updateStatus('statusEnabled', isEnabled, isEnabled ? 'Enabled ✓' : 'Not Enabled');
+        
+        // Check if active
+        const isActive = KeyboardSetup.isKeyboardActive();
+        updateStatus('statusActive', isActive, isActive ? 'Fast Keyboard ✓' : 'Other Keyboard');
+        
+        // Update step numbers
+        if (isEnabled) {
+            document.querySelector('#step1 .step-number').classList.add('done');
+            document.querySelector('#step1 .step-number').textContent = '✓';
+        }
+        if (isActive) {
+            document.querySelector('#step2 .step-number').classList.add('done');
+            document.querySelector('#step2 .step-number').textContent = '✓';
+        }
+    } else {
+        // Running in browser or bridge not ready
+        updateStatus('statusEnabled', false, 'Check manually');
+        updateStatus('statusActive', false, 'Check manually');
+    }
+}
+
+function updateStatus(elementId, isGood, text) {
+    const el = document.getElementById(elementId);
+    el.className = 'status-value ' + (isGood ? 'enabled' : 'disabled');
+    el.innerHTML = text;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INITIALIZATION
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Check status on load
+document.addEventListener('DOMContentLoaded', () => {
+    // Wait a bit for bridge to be ready
+    setTimeout(checkStatus, 500);
+    
+    // Recheck when window gets focus (user returns from settings)
+    window.addEventListener('focus', () => {
+        setTimeout(checkStatus, 300);
+    });
+});
+
+// Called from Android when bridge is ready
+function onSetupBridgeReady() {
+    checkStatus();
+}
+</script>
+</body>
+</html>
