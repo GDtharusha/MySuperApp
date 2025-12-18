@@ -415,7 +415,7 @@ public class FastKeyboardService extends InputMethodService {
         keyView.setBackground(bg);
         
         keyView.setOnClickListener(v -> {
-            vibrate(3);
+            doVibrate(3);
             handleNativeKeyPress(key);
         });
         
@@ -1248,6 +1248,20 @@ public class FastKeyboardService extends InputMethodService {
     
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    private void doVibrate(int durationMs) {
+        try {
+            if (vibrator != null && vibrator.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE));
+                } else {
+                    vibrator.vibrate(durationMs);
+                }
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Vibration failed", e);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
